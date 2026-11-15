@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#071633">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Farco Time Check</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='28' fill='%230A3A8C'/%3E%3Cpath d='M34 26 H92 L84 43 H55 V53 H78 L70 69 H55 V94 H34 Z' fill='%23fff'/%3E%3Ccircle cx='87' cy='61' r='8' fill='%23F28C28'/%3E%3C/svg%3E">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+:root {
+  --bg: #071633; --card: #FFFFFF; --surface: #F3F6FA; --line: #DCE1E8; --text: #0B1424; --muted: #5B6676;
+  --primary: #0E5FD8; --accent: #F28C28; --in: #12A150; --out: #F28C28; --danger: #D93025;
+  --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body { font-family: 'IBM Plex Sans Thai', sans-serif; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+button, input { font-family: inherit; }
+.screen { display: none; min-height: 100%; }
+.screen.on { display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+/* ---------- Gate / pick (light sheet) ---------- */
+.sheet { flex: 1; background: linear-gradient(180deg, #071633 0, #0A3A8C 230px, var(--surface) 230px); padding: calc(28px + var(--safe-t)) 18px 30px; }
+.brand { display: flex; align-items: center; gap: 12px; color: #fff; margin-bottom: 22px; }
+.brand svg { width: 52px; height: 52px; flex-shrink: 0; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+.brand b { display: block; font-size: 19px; letter-spacing: .3px; }
+.brand small { display: block; font-size: 12px; opacity: .75; letter-spacing: 1.4px; text-transform: uppercase; }
+.panel { background: var(--card); border-radius: 18px; padding: 22px 18px; box-shadow: 0 14px 40px rgba(7,22,51,.18); max-width: 520px; margin: 0 auto; }
+.panel h2 { margin: 0 0 4px; font-size: 20px; }
+.muted { color: var(--muted); font-size: 14px; }
+.field { width: 100%; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); font-size: 18px; margin: 16px 0 12px; outline: none; }
+.field:focus { border-color: var(--primary); background: #fff; }
+.code-field { text-align: center; letter-spacing: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 24px; }
+.btn { width: 100%; border: none; border-radius: 12px; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .55; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-ghost { background: var(--surface); color: var(--text); border: 1.5px solid var(--line); }
+.err { color: var(--danger); font-size: 14px; font-weight: 600; min-height: 20px; margin-top: 10px; text-align: center; }
+.people { display: grid; gap: 8px; margin-top: 6px; max-height: 58vh; overflow-y: auto; }
+.person { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; text-align: left; width: 100%; }
+.person:active { transform: scale(.99); }
+.person img, .person .ph { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #CBD5E1; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.person b { display: block; font-size: 16px; }
+.person small { color: var(--muted); font-size: 13px; }
+.person .tag { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--in); background: rgba(18,161,80,.1); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.remember { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 14px 2px 0; color: var(--muted); }
+.remember input { width: 18px; height: 18px; accent-color: var(--primary); }
+
+/* ---------- Camera ---------- */
+#s-cam { position: fixed; inset: 0; background: #000; color: #fff; overflow: hidden; }
+#video, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#video.mirror { transform: scaleX(-1); }
+#overlay { pointer-events: none; }
+.topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: calc(10px + var(--safe-t)) 12px 10px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(7,22,51,.62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 6px 12px 6px 6px; font-size: 14px; font-weight: 600; cursor: pointer; max-width: 62vw; }
+.chip img, .chip .ph { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #334155; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,.2); background: rgba(7,22,51,.62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; font-size: 19px; cursor: pointer; flex-shrink: 0; }
+.spacer { flex: 1; }
+.status { position: absolute; top: calc(64px + var(--safe-t)); left: 12px; right: 12px; z-index: 5; display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(7,22,51,.62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.pill.good { background: rgba(18,161,80,.88); } .pill.warn { background: rgba(217,119,6,.9); } .pill.bad { background: rgba(217,48,37,.9); }
+.controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; padding: 12px 16px calc(18px + var(--safe-b)); background: linear-gradient(transparent, rgba(0,0,0,.55) 35%); }
+.seg { display: flex; gap: 4px; background: rgba(7,22,51,.62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 999px; padding: 4px; max-width: 360px; margin: 0 auto 16px; border: 1px solid rgba(255,255,255,.15); }
+.seg button { flex: 1; border: none; background: transparent; color: rgba(255,255,255,.75); padding: 9px 6px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.seg button.on { background: #fff; color: var(--text); }
+.seg button.on[data-v="in"] { background: var(--in); color: #fff; }
+.seg button.on[data-v="out"] { background: var(--out); color: #fff; }
+.shoot-row { display: flex; align-items: center; justify-content: space-around; max-width: 420px; margin: 0 auto; }
+.shutter { width: 78px; height: 78px; border-radius: 50%; border: 5px solid #fff; background: rgba(255,255,255,.25); cursor: pointer; position: relative; }
+.shutter::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: #fff; transition: transform .1s; }
+.shutter:active::after { transform: scale(.88); }
+.shutter:disabled { opacity: .45; }
+.note-bar { display: none; max-width: 420px; margin: 0 auto 12px; }
+.note-bar.on { display: flex; gap: 8px; }
+.note-bar input { flex: 1; padding: 11px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.3); background: rgba(7,22,51,.75); color: #fff; font-size: 15px; outline: none; }
+.cam-msg { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 30px; background: radial-gradient(circle at 50% 40%, #13213A, #060B14); }
+.cam-msg .big { font-size: 54px; }
+.cam-msg .btn { width: auto; padding: 13px 28px; }
+.flash { position: absolute; inset: 0; background: #fff; z-index: 9; pointer-events: none; animation: fl .35s ease-out forwards; }
+@keyframes fl { from { opacity: .9; } to { opacity: 0; } }
+
+/* ---------- Review / done ---------- */
+#s-review, #s-done { position: fixed; inset: 0; background: #060B14; color: #fff; z-index: 20; }
+.shot-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: calc(12px + var(--safe-t)) 12px 0; min-height: 0; }
+.shot-wrap img { max-width: 100%; max-height: 100%; border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.review-bar { padding: 14px 16px calc(18px + var(--safe-b)); display: grid; gap: 10px; max-width: 520px; width: 100%; margin: 0 auto; }
+.review-info { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.two { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.btn-light { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.2); }
+.btn-go { background: var(--in); color: #fff; }
+.result { text-align: center; padding: 6px 0 2px; }
+.result .t { font-size: 15px; opacity: .8; }
+.result .n { font-size: 22px; font-weight: 700; margin: 2px 0; }
+.result .type { display: inline-block; padding: 5px 16px; border-radius: 8px; font-weight: 700; margin: 6px 0; }
+.result .clock { font-family: 'IBM Plex Mono', monospace; font-size: 34px; font-weight: 600; }
+.spin { width: 48px; height: 48px; border-radius: 50%; border: 4px solid rgba(255,255,255,.2); border-top-color: #fff; animation: sp 0.9s linear infinite; margin: 0 auto 12px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* ---------- History ---------- */
+#s-hist { background: var(--surface); }
+.hist-head { position: sticky; top: 0; z-index: 2; background: #071633; color: #fff; display: flex; align-items: center; gap: 10px; padding: calc(12px + var(--safe-t)) 14px 12px; }
+.hist-head b { font-size: 17px; flex: 1; }
+.hist-list { padding: 12px; display: grid; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
+.h-day { font-size: 13px; font-weight: 700; color: var(--muted); margin: 8px 2px 0; }
+.h-item { display: grid; grid-template-columns: 76px 1fr; gap: 12px; background: #fff; border-radius: 14px; padding: 10px; border: 1px solid var(--line); }
+.h-item .th { width: 76px; height: 76px; border-radius: 10px; object-fit: cover; background: var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+.h-item b { font-size: 16px; }
+.tp { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; padding: 2px 9px; border-radius: 6px; margin-left: 6px; vertical-align: 2px; }
+.tp.in { background: var(--in); } .tp.out { background: var(--out); }
+.h-item .meta { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); display: none; align-items: center; justify-content: center; padding: 14px; }
+.viewer img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+#toast { position: fixed; left: 50%; bottom: calc(130px + var(--safe-b)); transform: translateX(-50%); z-index: 60; background: rgba(11,20,36,.94); color: #fff; padding: 11px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90vw; text-align: center; border-left: 4px solid var(--accent); }
+#toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="logo" viewBox="0 0 120 120">
+    <defs>
+      <linearGradient id="lbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#071633"/><stop offset=".55" stop-color="#0A3A8C"/><stop offset="1" stop-color="#0E5FD8"/></linearGradient>
+      <radialGradient id="lpel" cx=".35" cy=".35" r=".7"><stop offset="0" stop-color="#FFC27A"/><stop offset="1" stop-color="#E9730C"/></radialGradient>
+    </defs>
+    <rect width="120" height="120" rx="28" fill="url(#lbg)" stroke="rgba(255,255,255,.25)" stroke-width="2"/>
+    <path d="M34 26 H92 L84 43 H55 V53 H78 L70 69 H55 V94 H34 Z" fill="#fff"/>
+    <circle cx="87" cy="61" r="8" fill="url(#lpel)"/>
+  </symbol>
+</defs></svg>
+
+<!-- 1. รหัสบริษัท -->
+<section class="screen" id="s-gate">
+  <div class="sheet">
+    <div class="brand"><svg><use href="#logo"/></svg><div><b>Farco Time Check</b><small>Farco International Co., Ltd.</small></div></div>
+    <div class="panel">
+      <h2>📸 เช็คชื่อเข้า-ออกงาน</h2>
+      <div class="muted">ถ่ายรูปพร้อมเวลาและตำแหน่งจริง ส่งเข้าระบบบริษัททันที</div>
+      <input class="field code-field" id="code" inputmode="numeric" autocomplete="off" placeholder="รหัสเช็คชื่อ" maxlength="12">
+      <button class="btn btn-primary" id="btn-code">ถัดไป</button>
+      <div class="err" id="gate-err"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. เลือกชื่อ -->
+<section class="screen" id="s-pick">
+  <div class="sheet">
+    <div class="brand"><svg><use href="#logo"/></svg><div><b>เลือกชื่อของคุณ</b><small>Farco International Co., Ltd.</small></div></div>
+    <div class="panel">
+      <input class="field" id="q" placeholder="🔍 พิมพ์ชื่อ ชื่อเล่น หรือรหัสพนักงาน" style="margin-top:0" autocomplete="off">
+      <div class="people" id="people"></div>
+      <label class="remember"><input type="checkbox" id="remember" checked> จำชื่อฉันไว้ในมือถือเครื่องนี้</label>
+      <div class="muted" style="margin-top:12px; font-size:13px">ไม่มีชื่อ? ให้หัวหน้า/แอดมินเพิ่มรายชื่อที่ระบบคลัง → ลงเวลา → ลงทะเบียน</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. กล้อง -->
+<section class="screen" id="s-cam">
+  <video id="video" playsinline muted autoplay class="mirror"></video>
+  <canvas id="overlay"></canvas>
+  <div class="cam-msg" id="cam-msg">
+    <div class="big">📷</div>
+    <div id="cam-msg-text">ต้องใช้กล้องและตำแหน่ง (GPS) เพื่อเช็คชื่อ</div>
+    <button class="btn btn-primary" id="btn-start">เปิดกล้อง</button>
+  </div>
+  <div class="topbar">
+    <button class="chip" id="me-chip"><span class="ph">🙂</span><span id="me-name">-</span></button>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="btn-hist" title="ประวัติของฉัน">🕘</button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="controls">
+    <div class="note-bar" id="note-bar"><input id="note" maxlength="120" placeholder="หมายเหตุ เช่น ออกหน้างานลูกค้า / ส่งของ"></div>
+    <div class="seg" id="mode">
+      <button data-v="auto" class="on">อัตโนมัติ</button><button data-v="in">🟢 เข้างาน</button><button data-v="out">🟠 ออกงาน</button>
+    </div>
+    <div class="shoot-row">
+      <button class="icon-btn" id="btn-note" title="เพิ่มหมายเหตุ">📝</button>
+      <button class="shutter" id="shutter" aria-label="ถ่ายรูปเช็คชื่อ" disabled></button>
+      <button class="icon-btn" id="btn-flip" title="สลับกล้อง">🔄</button>
+    </div>
+  </div>
+</section>
+
+<!-- 4. ตรวจรูป -->
+<section class="screen" id="s-review">
+  <div class="shot-wrap"><img id="review-img" alt="รูปเช็คชื่อ"></div>
+  <div class="review-bar">
+    <div class="review-info" id="review-info"></div>
+    <div class="two">
+      <button class="btn btn-light" id="btn-retake">↺ ถ่ายใหม่</button>
+      <button class="btn btn-go" id="btn-send">✅ ส่งเช็คชื่อ</button>
+    </div>
+  </div>
+</section>
+
+<!-- 5. ผลลัพธ์ -->
+<section class="screen" id="s-done">
+  <div class="shot-wrap"><img id="done-img" alt=""></div>
+  <div class="review-bar">
+    <div class="result" id="done-info"></div>
+    <div class="two">
+      <button class="btn btn-light" id="btn-save">⬇️ บันทึกรูป</button>
+      <button class="btn btn-primary" id="btn-finish">เสร็จ</button>
+    </div>
+  </div>
+</section>
+
+<!-- 6. ประวัติ -->
+<section class="screen" id="s-hist">
+  <div class="hist-head"><button class="icon-btn" id="btn-back" style="width:38px;height:38px;font-size:16px">←</button><b>ประวัติเช็คชื่อของฉัน</b><span class="muted" style="color:#CBD5E1;font-size:12px">31 วัน</span></div>
+  <div class="hist-list" id="hist-list"></div>
+</section>
+
+<div class="viewer" id="viewer"><img alt=""></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ⚠️ ลิงก์ /exec เดียวกับระบบคลัง Farco (index.html)
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxsjTu4x2GrpDxRq_fK4oU3bKW86F-DtDy3LrzsXkdXH_fpx1zLKWtM8y8HJN8iAnwr/exec';
+const FACE_LIB = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.js';
+const FACE_MODELS = 'https://justadudewhohacks.github.io/face-api.js/models';
+const MAX_SIDE = 1280;
+
+const $ = id => document.getElementById(id);
+const LS = { code: 'farco_tm_code', me: 'farco_tm_me', facing: 'farco_tm_facing' };
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const lsDel = k => { try { localStorage.removeItem(k); } catch (e) {} };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const st = {
+  code: new URLSearchParams(location.search).get('c') || lsGet(LS.code) || '',
+  info: null, me: null, offset: 0, mode: 'auto', facing: lsGet(LS.facing) || 'user',
+  stream: null, pos: null, geoErr: '', address: '', addrAt: null, geo: null, weather: '',
+  shot: null, busy: false
+};
+if (new URLSearchParams(location.search).get('c')) history.replaceState(null, '', location.pathname);
+
+/* ---------- utils ---------- */
+let tT;
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('on'), 2600); }
+function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+const now = () => new Date(Date.now() + st.offset);
+const pad = n => String(n).padStart(2, '0');
+const TH_DAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const fmtDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+async function api(action, params = {}) {
+  const res = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, code: st.code, ...params }) });
+  let r;
+  try { r = await res.json(); } catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง'); }
+  if (r.status === 'auth' || r.status === 'locked') { lsDel(LS.code); st.code = ''; stopCam(); show('s-gate'); $('gate-err').textContent = r.message; throw new Error(r.message); }
+  return r;
+}
+
+/* ---------- 1. gate ---------- */
+async function enter(code) {
+  st.code = code;
+  const b = $('btn-code'); b.disabled = true; b.textContent = 'กำลังตรวจสอบ…'; $('gate-err').textContent = '';
+  try {
+    const t0 = Date.now();
+    const r = await api('tmInit');
+    if (r.status !== 'success') throw new Error(r.message || 'เข้าไม่ได้');
+    st.offset = r.now - Math.round((t0 + Date.now()) / 2);
+    st.info = r;
+    lsSet(LS.code, code);
+    const saved = lsGet(LS.me);
+    const me = saved && r.people.find(p => p.id === saved);
+    if (me) choose(me); else { renderPeople(); show('s-pick'); }
+  } catch (e) {
+    if (!$('gate-err').textContent) $('gate-err').textContent = /fetch|network/i.test(e.message) ? 'เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ต' : e.message;
+    show('s-gate');
+  } finally { b.disabled = false; b.textContent = 'ถัดไป'; }
+}
+$('btn-code').onclick = () => { const c = $('code').value.trim(); if (c) enter(c); };
+$('code').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-code').click(); });
+
+/* ---------- 2. pick ---------- */
+function avatar(p, cls = '') { return p.photo ? `<img class="${cls}" src="${esc(p.photo)}" alt="">` : `<span class="ph ${cls}">🙂</span>`; }
+function renderPeople() {
+  const q = $('q').value.trim().toLowerCase();
+  const list = st.info.people.filter(p => !q || `${p.name} ${p.nick} ${p.code} ${p.id} ${p.position}`.toLowerCase().includes(q));
+  $('people').innerHTML = list.length ? list.map(p => `
+    <button class="person" data-id="${esc(p.id)}">${avatar(p)}
+      <div style="min-width:0"><b>${esc(p.name)}${p.nick ? ` <span class="muted">(${esc(p.nick)})</span>` : ''}</b>
+      <small>${esc(p.position || p.dept || '')}${p.code ? ' · ' + esc(p.code) : ''}</small></div>
+      ${p.hasFace ? '<span class="tag">✓ ใบหน้า</span>' : ''}</button>`).join('')
+    : '<div class="muted" style="text-align:center;padding:20px">ไม่พบชื่อ</div>';
+}
+$('q').addEventListener('input', renderPeople);
+$('people').addEventListener('click', e => {
+  const b = e.target.closest('.person'); if (!b) return;
+  const p = st.info.people.find(x => x.id === b.dataset.id);
+  if (p) { if ($('remember').checked) lsSet(LS.me, p.id); else lsDel(LS.me); choose(p); }
+});
+
+function choose(p) {
+  st.me = p;
+  $('me-chip').innerHTML = `${avatar(p)}<span>${esc(p.nick || p.name)}</span>`;
+  show('s-cam');
+  if (p.hasFace || st.info.requireFace) loadFace();
+  startGeo();
+  startCam();
+}
+$('me-chip').onclick = () => {
+  if (!confirm('เปลี่ยนชื่อผู้เช็คชื่อ?')) return;
+  lsDel(LS.me); stopCam(); $('q').value = ''; renderPeople(); show('s-pick');
+};
+
+/* ---------- 3. camera ---------- */
+async function startCam() {
+  stopCam();
+  $('cam-msg').classList.remove('hidden');
+  $('cam-msg-text').textContent = 'กำลังเปิดกล้อง…';
+  $('btn-start').classList.add('hidden');
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('เบราว์เซอร์นี้ใช้กล้องไม่ได้ (ต้องเปิดผ่าน https)');
+    st.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: st.facing, width: { ideal: 1920 }, height: { ideal: 1440 } } });
+    const v = $('video');
+    v.srcObject = st.stream;
+    v.classList.toggle('mirror', st.facing === 'user');
+    await v.play();
+    $('cam-msg').classList.add('hidden');
+    updateShutter();
+  } catch (e) {
+    $('cam-msg-text').textContent = e && e.name === 'NotAllowedError' ? 'ไม่ได้รับอนุญาตให้ใช้กล้อง — อนุญาตกล้องในการตั้งค่าเบราว์เซอร์แล้วกดลองใหม่' : (e.message || 'เปิดกล้องไม่ได้');
+    $('btn-start').classList.remove('hidden');
+    $('btn-start').textContent = 'ลองใหม่';
+  }
+}
+function stopCam() { if (st.stream) st.stream.getTracks().forEach(t => t.stop()); st.stream = null; $('video').srcObject = null; updateShutter(); }
+$('btn-start').onclick = startCam;
+$('btn-flip').onclick = () => { st.facing = st.facing === 'user' ? 'environment' : 'user'; lsSet(LS.facing, st.facing); startCam(); };
+$('btn-note').onclick = () => { $('note-bar').classList.toggle('on'); if ($('note-bar').classList.contains('on')) $('note').focus(); };
+$('mode').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  st.mode = b.dataset.v;
+  $('mode').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopCam();
+  else if ($('s-cam').classList.contains('on')) startCam();
+});
+
+/* ---------- location / address / weather ---------- */
+let geoWatch = null, geoTimer = null;
+function startGeo() {
+  if (!navigator.geolocation) { st.geoErr = 'อุปกรณ์ไม่รองรับ GPS'; renderStatus(); return; }
+  if (geoWatch != null) return;
+  geoWatch = navigator.geolocation.watchPosition(p => {
+    st.pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) };
+    st.geoErr = '';
+    clearTimeout(geoTimer); geoTimer = setTimeout(refreshPlace, 400);
+    renderStatus(); updateShutter();
+  }, e => { st.geoErr = e.code === 1 ? 'ไม่ได้อนุญาตตำแหน่ง (GPS)' : 'หาตำแหน่งไม่ได้'; renderStatus(); updateShutter(); },
+  { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+}
+function distM(a, b) {
+  const R = 6371000, r = Math.PI / 180;
+  const h = Math.sin((b.lat - a.lat) * r / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin((b.lng - a.lng) * r / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function areaOf(pos) {
+  const site = st.info && st.info.site;
+  if (!site || !pos) return null;
+  const d = Math.round(distM(pos, site));
+  return { d, inside: d - Math.min(pos.acc, 100) <= site.radius, name: site.name };
+}
+let placeBusy = false;
+async function refreshPlace() {
+  const p = st.pos; if (!p || placeBusy) return;
+  if (st.addrAt && distM(p, st.addrAt) < 40 && st.address) return;
+  placeBusy = true;
+  try {
+    const r = await api('tmGeocode', { lat: p.lat, lng: p.lng });
+    if (r.status === 'success') { st.address = r.address || ''; st.addrAt = { lat: p.lat, lng: p.lng }; }
+  } catch (e) {} finally { placeBusy = false; }
+  if (!st.weather) loadWeather();
+}
+const WX = c => c === 0 ? '☀️' : c <= 2 ? '🌤️' : c === 3 ? '☁️' : c <= 48 ? '🌫️' : c <= 67 || (c >= 80 && c <= 82) ? '🌧️' : c >= 95 ? '⛈️' : '🌦️';
+async function loadWeather() {
+  const p = st.pos; if (!p) return;
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat.toFixed(3)}&longitude=${p.lng.toFixed(3)}&current=temperature_2m,weather_code`);
+    const j = await r.json();
+    if (j.current) st.weather = `${WX(j.current.weather_code)} ${Math.round(j.current.temperature_2m)}°C`;
+  } catch (e) {}
+}
+setInterval(() => { st.weather = ''; loadWeather(); }, 15 * 60000);
+
+function renderStatus() {
+  const box = $('status'), a = areaOf(st.pos);
+  const out = [];
+  if (st.geoErr) out.push(`<span class="pill bad">⚠️ ${esc(st.geoErr)}</span>`);
+  else if (!st.pos) out.push('<span class="pill">📍 กำลังหาตำแหน่ง…</span>');
+  else {
+    out.push(`<span class="pill ${st.pos.acc > 100 ? 'warn' : ''}">📍 ±${st.pos.acc} ม.</span>`);
+    if (a) out.push(`<span class="pill ${a.inside ? 'good' : 'warn'}">${a.inside ? '✅ ในพื้นที่' : '⚠️ นอกพื้นที่'} · ${a.d.toLocaleString('th-TH')} ม.</span>`);
+  }
+  if (st.me && (st.me.hasFace || (st.info && st.info.requireFace))) out.push(`<span class="pill ${face.ready ? 'good' : ''}">${face.ready ? '🙂 ตรวจใบหน้าพร้อม' : face.err ? '🙂 ' + esc(face.err) : '🙂 กำลังโหลดตัวตรวจใบหน้า…'}</span>`);
+  box.innerHTML = out.join('');
+}
+function updateShutter() {
+  const needFace = st.info && st.info.requireFace;
+  $('shutter').disabled = !st.stream || !st.pos || (needFace && !face.ready) || st.busy;
+}
+
+/* ---------- face (optional) ---------- */
+const face = { ready: false, loading: null, err: '' };
+function loadFace() {
+  if (face.loading) return face.loading;
+  face.loading = (async () => {
+    try {
+      if (!window.faceapi) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = FACE_LIB; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+      await Promise.all([faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODELS), faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODELS), faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS)]);
+      face.ready = true;
+    } catch (e) { face.err = 'โหลดตัวตรวจใบหน้าไม่ได้'; }
+    renderStatus(); updateShutter();
+  })();
+  renderStatus();
+  return face.loading;
+}
+async function faceDescriptor(canvas) {
+  if (!face.ready) return null;
+  try {
+    const r = await faceapi.detectSingleFace(canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks().withFaceDescriptor();
+    return r ? Array.from(r.descriptor).map(x => Math.round(x * 10000) / 10000) : null;
+  } catch (e) { return null; }
+}
+
+/* ---------- watermark (Timemark style) ---------- */
+let logoImg = null;
+(() => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#071633"/><stop offset=".55" stop-color="#0A3A8C"/><stop offset="1" stop-color="#0E5FD8"/></linearGradient></defs><rect width="120" height="120" rx="28" fill="url(#g)"/><path d="M34 26 H92 L84 43 H55 V53 H78 L70 69 H55 V94 H34 Z" fill="#fff"/><circle cx="87" cy="61" r="8" fill="#F28C28"/></svg>`;
+  const i = new Image(); i.onload = () => { logoImg = i; }; i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+})();
+const FONT = "'IBM Plex Sans Thai', sans-serif";
+function wrap(ctx, text, maxW, maxLines) {
+  const words = String(text).split(/(\s+)/), lines = [];
+  let cur = '';
+  for (const w of words) {
+    const t = cur + w;
+    if (ctx.measureText(t).width > maxW && cur.trim()) { lines.push(cur.trim()); cur = w.trimStart(); }
+    else cur = t;
+    while (ctx.measureText(cur).width > maxW) {   // คำยาว/ภาษาไทยไม่มีเว้นวรรค
+      let k = cur.length; while (k > 1 && ctx.measureText(cur.slice(0, k)).width > maxW) k--;
+      lines.push(cur.slice(0, k)); cur = cur.slice(k);
+    }
+  }
+  if (cur.trim()) lines.push(cur.trim());
+  if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] = lines[maxLines - 1].replace(/.{0,2}$/, '…'); }
+  return lines;
+}
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+function stampData(typeLabel) {
+  const d = now(), a = areaOf(st.pos), p = st.pos;
+  return {
+    d, time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, sec: pad(d.getSeconds()), date: fmtDate(d), day: 'วัน' + TH_DAYS[d.getDay()],
+    weather: st.weather, type: typeLabel, address: st.address || (p ? 'กำลังค้นหาที่อยู่…' : ''),
+    coord: p ? `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}  ±${p.acc} ม.` : 'ไม่มีตำแหน่ง',
+    area: a ? `${a.inside ? '✅ ในพื้นที่' : '⚠️ นอกพื้นที่'} ${a.name} · ${a.d.toLocaleString('th-TH')} ม.` : '',
+    areaOk: a ? a.inside : null,
+    name: st.me ? `${st.me.name}${st.me.position ? ' · ' + st.me.position : ''}` : '',
+    id: st.me ? st.me.id : '', note: $('note').value.trim()
+  };
+}
+function modeLabel() { return st.mode === 'in' ? 'เข้างาน' : st.mode === 'out' ? 'ออกงาน' : 'เช็คชื่อ'; }
+
+function drawStamp(ctx, W, H, s, opt) {
+  opt = opt || {};
+  const u = Math.min(W, H) / 720;
+  const P = 30 * u, maxW = W - P * 2;
+  const TOP = opt.top != null ? opt.top : P, BOT = opt.bottom != null ? opt.bottom : P;
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  // header badge
+  const bh = 64 * u;
+  ctx.font = `700 ${22 * u}px ${FONT}`;
+  const t1 = 'FARCO INTERNATIONAL';
+  ctx.font = `700 ${22 * u}px ${FONT}`; const w1 = ctx.measureText(t1).width;
+  ctx.font = `500 ${16 * u}px ${FONT}`; const w2 = ctx.measureText('TIME ATTENDANCE · ยืนยันเวลาจริง').width;
+  const bw = bh + 14 * u + Math.max(w1, w2) + 20 * u;
+  if (!opt.noHeader) {
+  rrect(ctx, P, TOP, bw, bh, bh / 2); ctx.fillStyle = 'rgba(7,22,51,.62)'; ctx.fill();
+  if (logoImg) ctx.drawImage(logoImg, P + 6 * u, TOP + 6 * u, bh - 12 * u, bh - 12 * u);
+  ctx.fillStyle = '#fff'; ctx.font = `700 ${22 * u}px ${FONT}`; ctx.fillText(t1, P + bh + 6 * u, TOP + 29 * u);
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = `500 ${16 * u}px ${FONT}`; ctx.fillText('TIME ATTENDANCE · ยืนยันเวลาจริง', P + bh + 6 * u, TOP + 50 * u);
+  }
+
+  // body lines (bottom-up layout)
+  const rows = [];
+  ctx.font = `600 ${27 * u}px ${FONT}`;
+  wrap(ctx, '📍 ' + s.address, maxW, 2).forEach(t => rows.push({ t, f: `600 ${27 * u}px ${FONT}`, h: 36 * u, c: '#fff' }));
+  rows.push({ t: '🧭 ' + s.coord, f: `500 ${21 * u}px ${FONT}`, h: 30 * u, c: 'rgba(255,255,255,.85)' });
+  if (s.area) rows.push({ t: s.area, f: `600 ${21 * u}px ${FONT}`, h: 30 * u, c: s.areaOk ? '#86EFAC' : '#FCD34D' });
+  ctx.font = `700 ${27 * u}px ${FONT}`;
+  wrap(ctx, '👤 ' + s.name, maxW, 1).forEach(t => rows.push({ t, f: `700 ${27 * u}px ${FONT}`, h: 38 * u, c: '#fff' }));
+  if (s.note) { ctx.font = `500 ${23 * u}px ${FONT}`; wrap(ctx, '📝 ' + s.note, maxW, 2).forEach(t => rows.push({ t, f: `500 ${23 * u}px ${FONT}`, h: 32 * u, c: '#fff' })); }
+  const timeH = 118 * u, pillH = 42 * u, gap = 12 * u;
+  const rowsH = rows.reduce((a, r) => a + r.h, 0);
+  const footH = 30 * u;
+  const blockH = timeH + gap + pillH + gap + rowsH + footH;
+  const top = H - BOT - blockH;
+
+  const g = ctx.createLinearGradient(0, top - 120 * u, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.35, 'rgba(0,0,0,.45)'); g.addColorStop(1, 'rgba(0,0,0,.7)');
+  ctx.fillStyle = g; ctx.fillRect(0, top - 120 * u, W, H - top + 120 * u);
+
+  ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 6 * u;
+  // time
+  let y = top + 100 * u;
+  ctx.fillStyle = '#fff'; ctx.font = `700 ${112 * u}px ${FONT}`;
+  ctx.fillText(s.time, P - 4 * u, y);
+  let x = P + ctx.measureText(s.time).width + 4 * u;
+  ctx.font = `600 ${34 * u}px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(':' + s.sec, x, y);
+  x += ctx.measureText(':' + s.sec).width + 18 * u;
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#F28C28'; ctx.fillRect(x, y - 88 * u, 6 * u, 92 * u);
+  ctx.shadowBlur = 6 * u;
+  x += 20 * u;
+  ctx.fillStyle = '#fff'; ctx.font = `700 ${32 * u}px ${FONT}`; ctx.fillText(s.date, x, y - 52 * u);
+  ctx.font = `500 ${27 * u}px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.fillText(s.day + (s.weather ? '   ' + s.weather : ''), x, y - 8 * u);
+
+  // type pill
+  y = top + timeH + gap;
+  const tc = s.type === 'เข้างาน' ? '#12A150' : s.type === 'ออกงาน' ? '#E8780F' : '#0E5FD8';
+  const tl = (s.type === 'เข้างาน' ? '🟢 ' : s.type === 'ออกงาน' ? '🟠 ' : '🕘 ') + s.type;
+  ctx.font = `700 ${25 * u}px ${FONT}`;
+  const pw = ctx.measureText(tl).width + 32 * u;
+  ctx.shadowBlur = 0; rrect(ctx, P, y, pw, pillH, 10 * u); ctx.fillStyle = tc; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(tl, P + 16 * u, y + 30 * u);
+  ctx.shadowBlur = 6 * u;
+
+  // rows
+  y += pillH + gap;
+  rows.forEach(r => { y += r.h; ctx.font = r.f; ctx.fillStyle = r.c; ctx.fillText(r.t, P, y - 8 * u); });
+
+  // footer
+  ctx.shadowBlur = 0;
+  ctx.font = `500 ${16 * u}px 'IBM Plex Mono', monospace`; ctx.fillStyle = 'rgba(255,255,255,.65)';
+  const foot = `${s.id} · ${s.date} ${s.time}:${s.sec} · Farco Time Check`;
+  ctx.fillText(foot, P, H - BOT + 2 * u);
+  ctx.restore();
+}
+
+/* live preview overlay */
+function drawOverlay() {
+  const c = $('overlay');
+  if ($('s-cam').classList.contains('on') && st.stream) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const ctl = document.querySelector('.controls').offsetHeight;
+    drawStamp(ctx, W, H, stampData(modeLabel()), { noHeader: true, bottom: (ctl + 4) * dpr });
+  }
+  setTimeout(drawOverlay, 500);
+}
+
+/* ---------- 4. capture ---------- */
+$('shutter').onclick = async () => {
+  const v = $('video');
+  if (!v.videoWidth || !st.pos) return;
+  if (st.info.site && st.info.blockOutside) {
+    const a = areaOf(st.pos);
+    if (a && !a.inside) { toast(`อยู่นอกพื้นที่ทำงาน (ห่าง ${a.d.toLocaleString('th-TH')} ม.) — เช็คชื่อไม่ได้`); return; }
+  }
+  const fl = document.createElement('div'); fl.className = 'flash'; $('s-cam').appendChild(fl); setTimeout(() => fl.remove(), 400);
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  const sc = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
+  const W = Math.round(v.videoWidth * sc), H = Math.round(v.videoHeight * sc);
+  // ครอปให้ตรงกับที่เห็นบนจอ (object-fit: cover)
+  const vr = v.clientWidth / v.clientHeight, ir = W / H;
+  let cw = W, ch = H;
+  if (ir > vr) cw = Math.round(H * vr); else ch = Math.round(W / vr);
+  const raw = document.createElement('canvas'); raw.width = cw; raw.height = ch;
+  const rc = raw.getContext('2d');
+  const sx = (v.videoWidth - cw / sc) / 2, sy = (v.videoHeight - ch / sc) / 2;
+  if (st.facing === 'user') { rc.translate(cw, 0); rc.scale(-1, 1); }   // เก็บรูปแบบที่เห็น (กระจก) ให้คนดูไม่งง
+  rc.drawImage(v, sx, sy, cw / sc, ch / sc, 0, 0, cw, ch);
+
+  const stamp = stampData(modeLabel());
+  st.shot = { raw, stamp, desc: null, shotAt: stamp.d.getTime() };
+  const out = document.createElement('canvas'); out.width = cw; out.height = ch;
+  const oc = out.getContext('2d');
+  oc.drawImage(raw, 0, 0);
+  try { await document.fonts.load(`700 40px 'IBM Plex Sans Thai'`); } catch (e) {}
+  drawStamp(oc, cw, ch, stamp);
+  st.shot.data = out.toDataURL('image/jpeg', 0.86);
+  $('review-img').src = st.shot.data;
+  show('s-review');
+
+  const info = $('review-info');
+  info.innerHTML = `<span class="pill">${esc(stamp.date)} ${esc(stamp.time)}</span>` + (stamp.area ? `<span class="pill ${stamp.areaOk ? 'good' : 'warn'}">${esc(stamp.area)}</span>` : '');
+  if (st.me.hasFace || st.info.requireFace) {
+    info.insertAdjacentHTML('beforeend', '<span class="pill" id="face-pill">🙂 กำลังตรวจใบหน้า…</span>');
+    if (!face.ready) await loadFace();
+    st.shot.desc = await faceDescriptor(raw);
+    const fp = $('face-pill');
+    if (fp) { fp.className = 'pill ' + (st.shot.desc ? 'good' : 'warn'); fp.textContent = st.shot.desc ? '🙂 พบใบหน้า' : '⚠️ ไม่พบใบหน้าในรูป'; }
+    if (!st.shot.desc && st.info.requireFace) toast('ไม่พบใบหน้า — ถ่ายใหม่ให้เห็นหน้าชัดๆ');
+  }
+};
+$('btn-retake').onclick = () => { st.shot = null; show('s-cam'); };
+
+$('btn-send').onclick = async () => {
+  if (!st.shot || st.busy) return;
+  if (st.info.requireFace && !st.shot.desc) { toast('ไม่พบใบหน้าในรูป — กดถ่ายใหม่'); return; }
+  st.busy = true;
+  const b = $('btn-send'); b.disabled = true; b.textContent = 'กำลังส่ง…';
+  try {
+    const p = st.pos;
+    const r = await api('tmCheck', {
+      id: st.me.id, type: st.mode, photo: st.shot.data, shotAt: st.shot.shotAt, descriptor: st.shot.desc,
+      lat: p.lat, lng: p.lng, acc: p.acc, address: st.address, note: st.shot.stamp.note,
+      device: (/(android|iphone|ipad)/i.exec(navigator.userAgent) || ['เว็บ'])[0]
+    });
+    if (r.status === 'success') return done(r.record);
+    toast(r.message || 'ส่งไม่สำเร็จ');
+    if (r.status === 'duplicate' || r.status === 'outside') { st.shot = null; show('s-cam'); }
+  } catch (e) {
+    toast(/fetch|network/i.test(e.message) ? 'เชื่อมต่อไม่ได้ — ลองกดส่งอีกครั้ง' : e.message);
+  } finally { st.busy = false; b.disabled = false; b.textContent = '✅ ส่งเช็คชื่อ'; updateShutter(); }
+};
+
+/* ---------- 5. done ---------- */
+function done(rec) {
+  $('done-img').src = st.shot.data;
+  const isIn = rec.type === 'เข้างาน';
+  const h = now().getHours();
+  $('done-info').innerHTML = `<div class="t">${isIn ? `สวัสดีตอน${h < 12 ? 'เช้า' : h < 17 ? 'บ่าย' : 'เย็น'} 👋` : 'เดินทางกลับปลอดภัย 🙏'}</div>
+    <div class="n">${esc(rec.name)}</div>
+    <span class="type" style="background:${isIn ? 'var(--in)' : 'var(--out)'}">${isIn ? '🟢' : '🟠'} ${esc(rec.type)}</span>
+    <div class="clock">${esc(rec.time)}</div>
+    <div class="muted" style="color:#CBD5E1">บันทึกเข้าระบบแล้ว ✓${rec.conf !== '' && rec.conf != null ? ` · ใบหน้า ${rec.conf}%` : ''}${rec.location && rec.location.inArea ? ' · ' + esc(rec.location.inArea) : ''}</div>`;
+  $('note').value = ''; $('note-bar').classList.remove('on');
+  show('s-done');
+  if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+  stopCam();
+}
+$('btn-save').onclick = () => {
+  if (!st.shot) return;
+  const a = document.createElement('a');
+  const d = st.shot.stamp.d;
+  a.href = st.shot.data; a.download = `Farco_${st.me.id}_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.jpg`;
+  document.body.appendChild(a); a.click(); a.remove();
+};
+$('btn-finish').onclick = () => { st.shot = null; show('s-cam'); startCam(); };
+
+/* ---------- 6. history ---------- */
+$('btn-hist').onclick = async () => {
+  stopCam(); show('s-hist');
+  const box = $('hist-list');
+  box.innerHTML = '<div class="muted" style="text-align:center;padding:30px">กำลังโหลด…</div>';
+  try {
+    const r = await api('tmHistory', { id: st.me.id });
+    const L = r.logs || [];
+    let day = '';
+    box.innerHTML = L.length ? L.map(l => {
+      const head = l.date !== day ? `<div class="h-day">${esc(l.date)}</div>` : '';
+      day = l.date;
+      const isIn = l.type === 'เข้างาน';
+      return head + `<div class="h-item">${l.thumb ? `<img class="th" src="${esc(l.thumb)}" data-full="${esc(l.shot)}" alt="" loading="lazy">` : '<div class="th">🙂</div>'}
+        <div style="min-width:0"><b>${esc(l.time)}</b><span class="tp ${isIn ? 'in' : 'out'}">${esc(l.type)}</span>
+        <div class="meta">${esc(l.method)}${l.inArea && l.inArea !== 'ไม่มีตำแหน่ง' ? ' · ' + esc(l.inArea) + (l.dist != null ? ` ${l.dist} ม.` : '') : ''}${l.conf ? ` · ใบหน้า ${l.conf}%` : ''}
+        ${l.address ? '<br>📍 ' + esc(l.address) : ''}${l.note ? '<br>📝 ' + esc(l.note) : ''}</div></div></div>`;
+    }).join('') : '<div class="muted" style="text-align:center;padding:30px">ยังไม่มีประวัติใน 31 วันที่ผ่านมา</div>';
+  } catch (e) { box.innerHTML = `<div class="muted" style="text-align:center;padding:30px">⚠️ ${esc(e.message)}</div>`; }
+};
+$('btn-back').onclick = () => { show('s-cam'); startCam(); };
+$('hist-list').addEventListener('click', e => { const i = e.target.closest('img[data-full]'); if (i) { $('viewer').querySelector('img').src = i.dataset.full; $('viewer').style.display = 'flex'; } });
+$('viewer').onclick = () => { $('viewer').style.display = 'none'; };
+
+/* ---------- boot ---------- */
+setInterval(renderStatus, 5000);
+drawOverlay();
+if (st.code) { $('code').value = st.code; show('s-gate'); enter(st.code); } else show('s-gate');
+</script>
+</body>
+</html>
